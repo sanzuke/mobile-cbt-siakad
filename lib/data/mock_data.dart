@@ -98,11 +98,20 @@ const historyEntries = [
   HistoryEntry(title: 'Ulangan Harian — IPA', date: '05 Jul 2026', pending: true),
 ];
 
+/// Mirrors `QuestionBank.type` on the backend — only the two types the
+/// mobile UI currently renders differently (auto-graded vs. hand-graded).
+enum QuestionType { mcq, essay }
+
 class ExamQuestion {
+  final QuestionType type;
   final String text;
   final List<String> options;
 
-  const ExamQuestion({required this.text, required this.options});
+  const ExamQuestion({
+    this.type = QuestionType.mcq,
+    required this.text,
+    this.options = const [],
+  });
 }
 
 final List<ExamQuestion> fiqihQuestions = List.generate(activeExam.questionCount, (i) {
@@ -117,6 +126,18 @@ final List<ExamQuestion> fiqihQuestions = List.generate(activeExam.questionCount
         'Tertib atau berurutan',
         'Membaca basmalah di awal wudhu',
       ],
+    );
+  }
+  if (i == 20) {
+    return const ExamQuestion(
+      type: QuestionType.essay,
+      text: 'Jelaskan tata cara tayamum beserta syarat-syarat diperbolehkannya!',
+    );
+  }
+  if (i == 23) {
+    return const ExamQuestion(
+      type: QuestionType.essay,
+      text: "Sebutkan dan jelaskan rukun sholat jama' qashar!",
     );
   }
   return ExamQuestion(

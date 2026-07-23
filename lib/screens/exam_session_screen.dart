@@ -19,8 +19,10 @@ class ExamSessionScreen extends StatefulWidget {
 class _ExamSessionScreenState extends State<ExamSessionScreen> {
   // Demo starts mid-exam so the nav grid shows a realistic mix of states.
   int _current = 5;
-  final Map<int, int> _answers = {0: 0, 1: 1, 2: 2, 3: 0, 4: 3, 5: 0};
+  // int for MCQ (selected option index), String for essay (free text).
+  final Map<int, Object> _answers = {0: 0, 1: 1, 2: 2, 3: 0, 4: 3, 5: 0};
   final Set<int> _flagged = {6};
+  final Map<int, TextEditingController> _essayControllers = {};
   late int _secondsLeft = 42 * 60 + 17;
   Timer? _timer;
 
@@ -39,7 +41,17 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    for (final c in _essayControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  TextEditingController _essayControllerFor(int index) {
+    return _essayControllers.putIfAbsent(
+      index,
+      () => TextEditingController(text: _answers[index] as String? ?? ''),
+    );
   }
 
   String get _timerLabel {
@@ -131,22 +143,38 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
                                 style: TextStyle(fontSize: 17, height: 1.6, color: p.ink)),
                           ),
                           const SizedBox(height: 22),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 620),
-                            child: Column(
-                              children: [
-                                for (var i = 0; i < question.options.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 10),
-                                  _OptionTile(
-                                    letter: String.fromCharCode(65 + i),
-                                    text: question.options[i],
-                                    selected: _answers[_current] == i,
-                                    onTap: () => setState(() => _answers[_current] = i),
-                                  ),
+                          if (question.type == QuestionType.essay)
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 620),
+                              child: _EssayField(
+                                key: ValueKey('essay-$_current'),
+                                controller: _essayControllerFor(_current),
+                                onChanged: (text) => setState(() {
+                                  if (text.trim().isEmpty) {
+                                    _answers.remove(_current);
+                                  } else {
+                                    _answers[_current] = text;
+                                  }
+                                }),
+                              ),
+                            )
+                          else
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 620),
+                              child: Column(
+                                children: [
+                                  for (var i = 0; i < question.options.length; i++) ...[
+                                    if (i > 0) const SizedBox(height: 10),
+                                    _OptionTile(
+                                      letter: String.fromCharCode(65 + i),
+                                      text: question.options[i],
+                                      selected: _answers[_current] == i,
+                                      onTap: () => setState(() => _answers[_current] = i),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
                           const Spacer(),
                           Row(
                             children: [
@@ -274,6 +302,47 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
   }
 }
 
+/// Free-text answer for essay-type questions. These are hand-graded by the
+/// teacher afterwards (see admin-siakad's ExamResults page), unlike MCQ.
+class _EssayField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _EssayField({super.key, required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: p.amberSoft,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'Soal esai — dikoreksi manual oleh guru, tidak dinilai otomatis',
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: p.amber),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: controller,
+          onChanged: onChanged,
+          maxLines: 8,
+          minLines: 6,
+          style: TextStyle(fontSize: 14.5, color: p.ink, height: 1.5),
+          decoration: InputDecoration(
+            hintText: 'Tulis jawaban di sini...',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _OptionTile extends StatelessWidget {
   final String letter;
   final String text;
@@ -363,21 +432,29 @@ class _NavCell extends StatelessWidget {
       fg = p.amber;
       border = p.amber;
     }
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: EdgeInsets.all(current ? 2.5 : 0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: current ? Border.all(color: p.ink, width: 2) : null,
+      ),
+      child: Material(
+        color: bg,
         borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: border, width: current ? 2 : 1.5),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '$number',
-            style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 12.5, color: fg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border, width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$number',
+              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 12.5, color: fg),
+            ),
           ),
         ),
       ),
