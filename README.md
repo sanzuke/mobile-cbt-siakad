@@ -1,17 +1,33 @@
-# mobile_cbt_siakad
+# mobile-cbt-siakad
 
-A new Flutter project.
+Aplikasi mobile (Flutter) untuk siswa SIAKAD — pengerjaan ujian CBT (offline-capable, kiosk mode) dan akses materi pembelajaran di tablet.
 
-## Getting Started
+Backend/API dikonsumsi dari repo [`admin-siakad`](https://github.com/sanzuke/admin-siakad) (Laravel 12). Dokumen rencana teknis ada di `admin-siakad/docs/CBT_MOBILE_APP_PLAN.md`.
 
-This project is a starting point for a Flutter application.
+## Stack
 
-A few resources to get you started if this is your first Flutter project:
+- Flutter (stable channel)
+- Dart
+- REST API (Sanctum token auth) ke backend `admin-siakad`
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Branch
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- `main` — stabil / rilis
+- `dev` — branch development aktif
+
+## Menjalankan
+
+```bash
+flutter pub get
+flutter run
+```
+
+Base URL API di-set lewat `--dart-define`, contoh:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:8000/api/v1
+```
+
+## Struktur
+
+Struktur project standar Flutter (`lib/`, `android/`, `ios/`, dst). Kode aplikasi ada di `lib/main.dart`.
