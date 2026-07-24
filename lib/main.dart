@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'screens/login_screen.dart';
+import 'services/update_service.dart';
 import 'state/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'widgets/update_sheet.dart';
 
 void main() {
   runApp(const CbtApp());
@@ -17,10 +19,29 @@ class CbtApp extends StatefulWidget {
 
 class _CbtAppState extends State<CbtApp> {
   final _themeController = ThemeController();
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  final _updateService = UpdateService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  Future<void> _checkForUpdate() async {
+    final info = await _updateService.checkForUpdate();
+    if (info == null || !info.updateAvailable) return;
+
+    final context = _navigatorKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    await UpdateSheet.show(context, info: info, mandatory: info.isMandatory);
+  }
 
   @override
   void dispose() {
     _themeController.dispose();
+    _updateService.dispose();
     super.dispose();
   }
 
@@ -32,6 +53,7 @@ class _CbtAppState extends State<CbtApp> {
         animation: _themeController,
         builder: (context, _) {
           return MaterialApp(
+            navigatorKey: _navigatorKey,
             title: 'CBT SIAKAD',
             debugShowCheckedModeBanner: false,
             themeMode: _themeController.mode,

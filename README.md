@@ -22,11 +22,15 @@ flutter pub get
 flutter run
 ```
 
-Base URL API di-set lewat `--dart-define`, contoh:
+Base URL API di-set lewat `--dart-define` (default: `http://10.0.2.2:8000/api`, cocok untuk Android emulator yang mengakses `admin-siakad` di localhost host machine). Base URL **tanpa** `/v1` — versi endpoint (`/v1/app/...`, `/v1/student/...`) sudah ditambahkan otomatis lewat `ApiConfig`. Contoh untuk device fisik atau server lain:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:8000/api/v1
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api
 ```
+
+### Mekanisme update aplikasi
+
+Karena aplikasi belum didistribusikan lewat Play Store, tiap kali dibuka aplikasi mengecek versi terbaru ke `GET /api/v1/app/version` (backend `admin-siakad`, resource Filament **Rilis Aplikasi Mobile**). Jika ada rilis baru: update opsional menampilkan dialog yang bisa ditutup ("Nanti"), update wajib (ditandai *mandatory* oleh admin) memblokir aplikasi sampai APK terbaru diunduh & diinstal lewat installer bawaan Android.
 
 ## Struktur
 
