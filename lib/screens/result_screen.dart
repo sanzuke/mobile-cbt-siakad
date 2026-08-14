@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../models/exam_models.dart';
 import '../theme/app_palette.dart';
 import '../widgets/nav_rail.dart';
 import '../widgets/shell_header.dart';
 import 'app_shell.dart';
 
 class ResultScreen extends StatelessWidget {
-  const ResultScreen({super.key});
+  final ExamResult result;
 
-  static const _score = 87;
-  static const _kkm = 75;
+  const ResultScreen({super.key, required this.result});
 
   void _goToTab(BuildContext context, int index) {
     Navigator.of(context).pushAndRemoveUntil(
@@ -21,6 +21,9 @@ class ResultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final percentage = result.percentage;
+    final pending = !result.isFinal;
+
     return Scaffold(
       backgroundColor: p.paper,
       body: SafeArea(
@@ -57,21 +60,23 @@ class ResultScreen extends StatelessWidget {
                                       width: 120,
                                       height: 120,
                                       child: CircularProgressIndicator(
-                                        value: _score / 100,
+                                        value: percentage != null ? percentage / 100 : null,
                                         strokeWidth: 10,
                                         backgroundColor: p.surfaceVariant,
-                                        color: p.success,
+                                        color: pending ? p.amber : p.success,
                                       ),
                                     ),
                                     Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text('$_score',
-                                            style: TextStyle(
-                                                fontFamily: 'monospace',
-                                                fontSize: 28,
-                                                fontWeight: FontWeight.w700,
-                                                color: p.ink)),
+                                        Text(
+                                          percentage != null ? percentage.toStringAsFixed(0) : '—',
+                                          style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w700,
+                                              color: p.ink),
+                                        ),
                                         Text('dari 100',
                                             style: TextStyle(fontSize: 11, color: p.inkFaint)),
                                       ],
@@ -80,28 +85,39 @@ class ResultScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 18),
-                              Text('Ulangan Harian — Fiqih',
+                              Text(result.examSetTitle,
+                                  textAlign: TextAlign.center,
                                   style: TextStyle(
                                       fontWeight: FontWeight.w600, fontSize: 20, color: p.ink)),
                               const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: p.successSoft,
+                                  color: pending
+                                      ? p.amberSoft
+                                      : (result.passed == true ? p.successSoft : p.dangerSoft),
                                   borderRadius: BorderRadius.circular(999),
                                 ),
-                                child: Text('✓ Lulus KKM ($_kkm)',
-                                    style: TextStyle(
-                                        color: p.success,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12.5)),
+                                child: Text(
+                                  pending
+                                      ? '⏳ Menunggu koreksi soal esai'
+                                      : (result.passed == true
+                                          ? '✓ Lulus KKM (${result.passingScore?.toStringAsFixed(0) ?? '-'})'
+                                          : '✗ Belum mencapai KKM (${result.passingScore?.toStringAsFixed(0) ?? '-'})'),
+                                  style: TextStyle(
+                                      color: pending
+                                          ? p.amber
+                                          : (result.passed == true ? p.success : p.danger),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5),
+                                ),
                               ),
                               const SizedBox(height: 22),
-                              _ResultRow(label: 'Dikerjakan', value: '25 / 25 soal'),
+                              _ResultRow(
+                                  label: 'Dikerjakan',
+                                  value: '${result.answeredCount} / ${result.questionCount} soal'),
                               const SizedBox(height: 10),
-                              _ResultRow(label: 'Jawaban benar', value: '22 soal'),
-                              const SizedBox(height: 10),
-                              _ResultRow(label: 'Waktu digunakan', value: '47 menit 12 detik'),
+                              _ResultRow(label: 'Waktu digunakan', value: result.timeSpentLabel),
                               const SizedBox(height: 24),
                               SizedBox(
                                 width: double.infinity,

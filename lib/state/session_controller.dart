@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/exam_service.dart';
 
 enum SessionStatus { unknown, signedOut, signedIn }
 
@@ -11,10 +12,13 @@ enum SessionStatus { unknown, signedOut, signedIn }
 class SessionController extends ChangeNotifier {
   SessionController({AuthService? authService, ApiClient? apiClient})
       : _authService = authService ?? AuthService(),
-        apiClient = apiClient ?? ApiClient();
+        apiClient = apiClient ?? ApiClient() {
+    examService = ExamService(this.apiClient);
+  }
 
   final AuthService _authService;
   final ApiClient apiClient;
+  late final ExamService examService;
 
   SessionStatus status = SessionStatus.unknown;
   AuthenticatedStudent? student;

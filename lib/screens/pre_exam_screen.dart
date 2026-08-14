@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../data/mock_data.dart';
+import '../models/exam_models.dart';
+import '../state/session_controller.dart';
 import '../theme/app_palette.dart';
 import '../widgets/nav_rail.dart';
 import '../widgets/shell_header.dart';
@@ -8,26 +9,56 @@ import '../widgets/subject_chip.dart';
 import 'app_shell.dart';
 import 'exam_session_screen.dart';
 
-class PreExamScreen extends StatelessWidget {
-  const PreExamScreen({super.key});
+class PreExamScreen extends StatefulWidget {
+  final ExamSummary exam;
 
-  void _goToTab(BuildContext context, int index) {
+  const PreExamScreen({super.key, required this.exam});
+
+  @override
+  State<PreExamScreen> createState() => _PreExamScreenState();
+}
+
+class _PreExamScreenState extends State<PreExamScreen> {
+  bool _starting = false;
+  String? _error;
+
+  void _goToTab(int index) {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => AppShell(initialIndex: index)),
       (route) => false,
     );
   }
 
+  Future<void> _start() async {
+    setState(() {
+      _starting = true;
+      _error = null;
+    });
+    try {
+      final package = await SessionScope.of(context).examService.startExam(widget.exam.id);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ExamSessionScreen(package: package)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Tidak bisa memulai ujian. Periksa koneksi lalu coba lagi.';
+        _starting = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final exam = activeExam;
+    final exam = widget.exam;
     return Scaffold(
       backgroundColor: p.paper,
       body: SafeArea(
         child: Row(
           children: [
-            NavRail(selectedIndex: -1, onSelect: (i) => _goToTab(context, i)),
+            NavRail(selectedIndex: -1, onSelect: _goToTab),
             Container(width: 1, color: p.line),
             Expanded(
               child: Column(
@@ -58,8 +89,7 @@ class PreExamScreen extends StatelessWidget {
                                         .headlineSmall
                                         ?.copyWith(fontWeight: FontWeight.w600, fontSize: 22)),
                                 const SizedBox(height: 4),
-                                Text(exam.teacherNote,
-                                    style: TextStyle(fontSize: 13, color: p.inkSoft)),
+                                Text(exam.subjectName, style: TextStyle(fontSize: 13, color: p.inkSoft)),
                                 const SizedBox(height: 22),
                                 Row(
                                   children: [
@@ -67,7 +97,9 @@ class PreExamScreen extends StatelessWidget {
                                     const SizedBox(width: 12),
                                     Expanded(child: _StatBox(value: "${exam.durationMinutes}’", label: 'Durasi')),
                                     const SizedBox(width: 12),
-                                    Expanded(child: _StatBox(value: '${exam.attemptsAllowed}×', label: 'Percobaan')),
+                                    Expanded(
+                                        child: _StatBox(
+                                            value: '${exam.allowedAttempts}×', label: 'Percobaan')),
                                   ],
                                 ),
                                 const SizedBox(height: 22),
@@ -93,16 +125,24 @@ class PreExamScreen extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 16),
+                                  Text(_error!, style: TextStyle(fontSize: 12.5, color: p.danger)),
+                                ],
                                 const SizedBox(height: 22),
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(builder: (_) => const ExamSessionScreen()),
-                                      );
-                                    },
-                                    child: const Text('Mulai Ujian'),
+                                    onPressed: _starting ? null : _start,
+                                    child: _starting
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          )
+                                        : Text(exam.inProgressAttemptId != null
+                                            ? 'Lanjutkan Ujian'
+                                            : 'Mulai Ujian'),
                                   ),
                                 ),
                               ],
