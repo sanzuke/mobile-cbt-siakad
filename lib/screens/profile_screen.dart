@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
+import '../screens/login_screen.dart';
+import '../state/session_controller.dart';
 import '../state/theme_controller.dart';
 import '../theme/app_palette.dart';
 
@@ -10,6 +12,13 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // The API doesn't return kelas/wali/device fields yet (see
+    // AuthenticatedStudent doc), so those still fall back to mock data —
+    // only name/NISN/avatar come from the real logged-in session.
+    final student = SessionScope.of(context).student;
+    final name = student?.name ?? currentStudent.name;
+    final nisn = student?.nisn ?? currentStudent.nisn;
+    final initials = student?.initials ?? currentStudent.avatarInitials;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(26, 26, 26, 26),
       child: ConstrainedBox(
@@ -30,7 +39,7 @@ class ProfileScreen extends StatelessWidget {
                     radius: 28,
                     backgroundColor: p.accentSoft,
                     child: Text(
-                      currentStudent.avatarInitials,
+                      initials,
                       style: TextStyle(color: p.accent, fontWeight: FontWeight.w700, fontSize: 18),
                     ),
                   ),
@@ -38,9 +47,9 @@ class ProfileScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(currentStudent.name,
+                      Text(name,
                           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17, color: p.ink)),
-                      Text('NISN ${currentStudent.nisn}',
+                      Text('NISN $nisn',
                           style: TextStyle(fontFamily: 'monospace', fontSize: 12, color: p.inkFaint)),
                     ],
                   ),
@@ -88,7 +97,15 @@ class ProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: () async {
+                  final session = SessionScope.of(context);
+                  await session.logout();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: p.danger,
                   side: BorderSide(color: p.danger, width: 1.5),

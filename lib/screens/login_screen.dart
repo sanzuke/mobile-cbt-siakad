@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_client.dart';
+import '../state/session_controller.dart';
 import '../theme/app_palette.dart';
 import '../widgets/app_mark.dart';
 import 'app_shell.dart';
@@ -12,8 +14,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _nisnController = TextEditingController(text: '0081234521');
-  final _birthController = TextEditingController(text: '14 / 03 / 2011');
+  final _nisnController = TextEditingController();
+  final _birthController = TextEditingController();
+
+  bool _submitting = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -22,10 +27,46 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AppShell()),
-    );
+  /// Accepts `dd / MM / yyyy` or `dd/MM/yyyy` (what the field shows) and
+  /// converts to `yyyy-MM-dd` for the backend's `date` validation rule.
+  String? _isoBirthDate() {
+    final raw = _birthController.text.replaceAll(' ', '');
+    final parts = raw.split('/');
+    if (parts.length != 3) return null;
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    return '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _login() async {
+    final nisn = _nisnController.text.trim();
+    final birthDate = _isoBirthDate();
+
+    if (nisn.isEmpty || birthDate == null) {
+      setState(() => _error = 'Isi NISN dan tanggal lahir dengan format dd / mm / yyyy.');
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      await SessionScope.of(context).login(nisn: nisn, birthDate: birthDate);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const AppShell()),
+      );
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Tidak bisa terhubung ke server. Periksa koneksi tablet.');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -69,21 +110,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: _nisnController,
                     keyboardType: TextInputType.number,
+                    enabled: !_submitting,
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
                   ),
                   const SizedBox(height: 16),
-                  _FieldLabel('Tanggal Lahir'),
+                  _FieldLabel('Tanggal Lahir (dd / mm / yyyy)'),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _birthController,
+                    enabled: !_submitting,
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
                   ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, style: TextStyle(fontSize: 12.5, color: p.danger)),
+                  ],
                   const SizedBox(height: 22),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _login,
-                      child: const Text('Masuk'),
+                      onPressed: _submitting ? null : _login,
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Masuk'),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -97,15 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           text: TextSpan(
                             style: TextStyle(fontSize: 12, color: p.inkFaint, height: 1.5),
                             children: [
-                              const TextSpan(text: 'Tablet ini terdaftar untuk '),
-                              TextSpan(
-                                text: 'MTs · Kelas 8B',
-                                style: TextStyle(color: p.ink, fontWeight: FontWeight.w600),
-                              ),
-                              const TextSpan(
-                                text:
-                                    '. Mode ujian akan mengunci aplikasi lain saat sesi dimulai.',
-                              ),
+                              const TextSpan(text: 'Mode ujian akan mengunci aplikasi lain saat sesi dimulai.'),
                             ],
                           ),
                         ),

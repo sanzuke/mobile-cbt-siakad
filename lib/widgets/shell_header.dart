@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/mock_data.dart';
+import '../state/session_controller.dart';
 import '../theme/app_palette.dart';
 import 'pill.dart';
 import 'theme_toggle_button.dart';
@@ -15,6 +16,12 @@ class ShellHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    // 'kelas' isn't on the real API response yet — falls back to mock data,
+    // see AuthenticatedStudent doc in services/auth_service.dart.
+    final student = SessionScope.of(context).student;
+    final name = student?.name ?? currentStudent.name;
+    final initials = student?.initials ?? currentStudent.avatarInitials;
+    final kelas = student?.grade ?? currentStudent.kelas;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
       decoration: BoxDecoration(
@@ -27,7 +34,7 @@ class ShellHeader extends StatelessWidget {
             radius: 19,
             backgroundColor: p.accentSoft,
             child: Text(
-              currentStudent.avatarInitials,
+              initials,
               style: TextStyle(color: p.accent, fontWeight: FontWeight.w700, fontSize: 14),
             ),
           ),
@@ -38,11 +45,11 @@ class ShellHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  currentStudent.name,
+                  name,
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: p.ink),
                 ),
                 Text(
-                  currentStudent.kelas,
+                  kelas,
                   style: TextStyle(fontSize: 12, color: p.inkFaint),
                 ),
               ],
