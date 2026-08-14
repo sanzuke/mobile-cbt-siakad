@@ -23,17 +23,25 @@ class SessionController extends ChangeNotifier {
   SessionStatus status = SessionStatus.unknown;
   AuthenticatedStudent? student;
 
-  /// Call once at startup: if a token is already stored, wire it into
-  /// [apiClient] optimistically. There's no `/me` endpoint yet to re-fetch
-  /// the student profile, so a stored token resumes the API session but the
-  /// UI still needs a fresh login to populate [student] after a cold start.
+  /// Call once at startup: if a token is stored, wire it into [apiClient]
+  /// and re-fetch the profile via `/me` so the app can resume straight past
+  /// the login screen. Falls back to signed-out if there's no token, or the
+  /// stored one turns out to be expired/revoked server-side.
   Future<void> restore() async {
     final token = await _authService.readStoredToken();
     if (token == null) {
       status = SessionStatus.signedOut;
-    } else {
-      apiClient.setToken(token);
-      status = SessionStatus.signedOut; // see restore() doc: no /me endpoint yet
+      notifyListeners();
+      return;
+    }
+
+    apiClient.setToken(token);
+    try {
+      student = await _authService.fetchMe();
+      status = SessionStatus.signedIn;
+    } on ApiException {
+      apiClient.setToken(null);
+      status = SessionStatus.signedOut;
     }
     notifyListeners();
   }

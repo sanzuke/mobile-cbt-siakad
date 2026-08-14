@@ -76,6 +76,16 @@ class AuthService {
     return AuthenticatedStudent.fromJson(data['student'] as Map<String, dynamic>);
   }
 
+  /// Re-fetches the profile for whatever token is currently set on
+  /// [ApiClient] — used to resume a session after a cold start, when the
+  /// stored token survives but the in-memory [AuthenticatedStudent] doesn't.
+  /// Throws [ApiException] if the token is missing/expired; callers should
+  /// treat that as "not logged in" and fall back to the login screen.
+  Future<AuthenticatedStudent> fetchMe() async {
+    final data = await _client.get('/v1/student/me') as Map<String, dynamic>;
+    return AuthenticatedStudent.fromJson(data);
+  }
+
   Future<void> logout() async {
     try {
       await _client.post('/v1/student/logout');

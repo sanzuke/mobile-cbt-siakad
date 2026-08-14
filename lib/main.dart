@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'screens/app_shell.dart';
 import 'screens/login_screen.dart';
 import 'services/update_service.dart';
 import 'state/session_controller.dart';
 import 'state/theme_controller.dart';
+import 'theme/app_palette.dart';
 import 'theme/app_theme.dart';
 import 'widgets/update_sheet.dart';
 
@@ -12,7 +14,12 @@ void main() {
 }
 
 class CbtApp extends StatefulWidget {
-  const CbtApp({super.key});
+  /// Overridable for tests, so widget tests don't have to go through the
+  /// real [SessionController] (which touches platform secure storage —
+  /// see `test/widget_test.dart` for why that matters).
+  final SessionController? sessionController;
+
+  const CbtApp({super.key, this.sessionController});
 
   @override
   State<CbtApp> createState() => _CbtAppState();
@@ -20,7 +27,8 @@ class CbtApp extends StatefulWidget {
 
 class _CbtAppState extends State<CbtApp> {
   final _themeController = ThemeController();
-  final _sessionController = SessionController();
+  late final SessionController _sessionController =
+      widget.sessionController ?? SessionController();
   final _navigatorKey = GlobalKey<NavigatorState>();
   final _updateService = UpdateService();
 
@@ -65,11 +73,36 @@ class _CbtAppState extends State<CbtApp> {
               themeMode: _themeController.mode,
               theme: AppTheme.light,
               darkTheme: AppTheme.dark,
-              home: const LoginScreen(),
+              home: const _SessionGate(),
             );
           },
         ),
       ),
+    );
+  }
+}
+
+/// Routes to [AppShell] or [LoginScreen] once [SessionController.restore]
+/// resolves, showing a brief loading state while a stored token is being
+/// re-validated against `/me`.
+class _SessionGate extends StatelessWidget {
+  const _SessionGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+    return AnimatedBuilder(
+      animation: session,
+      builder: (context, _) {
+        return switch (session.status) {
+          SessionStatus.unknown => Scaffold(
+              backgroundColor: context.palette.paper,
+              body: const Center(child: CircularProgressIndicator()),
+            ),
+          SessionStatus.signedIn => const AppShell(),
+          SessionStatus.signedOut => const LoginScreen(),
+        };
+      },
     );
   }
 }
