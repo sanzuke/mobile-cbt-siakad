@@ -3,7 +3,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile_cbt_siakad/main.dart';
-import 'package:mobile_cbt_siakad/services/auth_service.dart';
 import 'package:mobile_cbt_siakad/state/session_controller.dart';
 
 /// In-memory stand-in for [FlutterSecureStorage] — the real one talks to
@@ -60,7 +59,7 @@ class _FakeSecureStorage extends FlutterSecureStorage {
 void main() {
   testWidgets('Login screen renders', (WidgetTester tester) async {
     final session = SessionController(
-      authService: AuthService(storage: _FakeSecureStorage()),
+      storage: _FakeSecureStorage(),
     );
 
     await tester.pumpWidget(CbtApp(sessionController: session));

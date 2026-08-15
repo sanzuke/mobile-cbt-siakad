@@ -97,6 +97,4 @@ class AuthService {
       _client.setToken(null);
     }
   }
-
-  void dispose() => _client.dispose();
 }

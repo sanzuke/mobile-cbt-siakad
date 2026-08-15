@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
@@ -9,14 +10,20 @@ enum SessionStatus { unknown, signedOut, signedIn }
 /// Holds the logged-in student + Sanctum token for the app's lifetime, and
 /// restores it from secure storage on cold start. Same InheritedNotifier
 /// pattern as [ThemeController]/[ThemeScope] — no external state package.
+///
+/// [AuthService] and [ExamService] deliberately share a single [ApiClient]
+/// instance (constructed here, never separately) — otherwise a token set by
+/// a login call on one client never reaches the other, and every
+/// [examService] call after login would 401. Only [storage] is injectable
+/// (for tests that need to fake secure storage), not a whole [AuthService].
 class SessionController extends ChangeNotifier {
-  SessionController({AuthService? authService, ApiClient? apiClient})
-      : _authService = authService ?? AuthService(),
-        apiClient = apiClient ?? ApiClient() {
+  SessionController({ApiClient? apiClient, FlutterSecureStorage? storage})
+      : apiClient = apiClient ?? ApiClient() {
+    _authService = AuthService(client: this.apiClient, storage: storage);
     examService = ExamService(this.apiClient);
   }
 
-  final AuthService _authService;
+  late final AuthService _authService;
   final ApiClient apiClient;
   late final ExamService examService;
 
@@ -40,7 +47,10 @@ class SessionController extends ChangeNotifier {
       student = await _authService.fetchMe();
       status = SessionStatus.signedIn;
     } on ApiException {
-      apiClient.setToken(null);
+      // Stored token is invalid/expired server-side — purge it (not just the
+      // in-memory copy on apiClient) so restore() doesn't keep retrying a
+      // dead token on every future cold start.
+      await _authService.logout();
       status = SessionStatus.signedOut;
     }
     notifyListeners();
@@ -70,7 +80,6 @@ class SessionController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _authService.dispose();
     apiClient.dispose();
     super.dispose();
   }
