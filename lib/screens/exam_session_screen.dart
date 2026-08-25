@@ -6,6 +6,7 @@ import '../models/exam_models.dart';
 import '../state/session_controller.dart';
 import '../theme/app_palette.dart';
 import '../widgets/pill.dart';
+import '../widgets/responsive.dart';
 import 'result_screen.dart';
 
 /// Deliberately has no [NavRail]/[ShellHeader] — the exam is locked to a
@@ -95,9 +96,9 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
     _syncDebounce = Timer(const Duration(seconds: 2), () async {
       try {
         await SessionScope.of(context).examService.syncAnswers(
-              widget.package.attempt.id,
-              [_questions[_current]],
-            );
+          widget.package.attempt.id,
+          [_questions[_current]],
+        );
         if (mounted) setState(() => _synced = true);
       } catch (_) {
         // Offline or backend hiccup — stays unsynced, next edit or the
@@ -113,8 +114,13 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
 
     final session = SessionScope.of(context);
     try {
-      await session.examService.syncAnswers(widget.package.attempt.id, _questions);
-      final result = await session.examService.submit(widget.package.attempt.id);
+      await session.examService.syncAnswers(
+        widget.package.attempt.id,
+        _questions,
+      );
+      final result = await session.examService.submit(
+        widget.package.attempt.id,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => ResultScreen(result: result)),
@@ -123,11 +129,55 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
       if (!mounted) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auto
-            ? 'Waktu habis tapi gagal mengumpulkan otomatis — coba lagi.'
-            : 'Gagal mengumpulkan ujian. Periksa koneksi lalu coba lagi.')),
+        SnackBar(
+          content: Text(
+            auto
+                ? 'Waktu habis tapi gagal mengumpulkan otomatis — coba lagi.'
+                : 'Gagal mengumpulkan ujian. Periksa koneksi lalu coba lagi.',
+          ),
+        ),
       );
     }
+  }
+
+  /// Phone-only: the side question-navigator panel doesn't fit next to the
+  /// question at narrow widths, so it lives in a modal sheet instead —
+  /// opened via the bottom bar. Picking a question or submitting closes the
+  /// sheet immediately rather than trying to keep it live-updating.
+  void _openNavigatorSheet(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: p.surfaceVariant,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 20 + MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          child: _QuestionNavigatorPanel(
+            questions: _questions,
+            flagged: _flagged,
+            current: _current,
+            submitting: _submitting,
+            onSelect: (i) {
+              Navigator.pop(sheetContext);
+              setState(() => _current = i);
+            },
+            onSubmit: () {
+              Navigator.pop(sheetContext);
+              _confirmSubmit(context);
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -135,16 +185,117 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
     final p = context.palette;
     final question = _questions[_current];
     final answeredCount = _questions.where((q) => q.isAnswered).length;
+    final wide = isWideLayout(context);
+
+    final questionColumn = Padding(
+      padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'SOAL ${_current + 1} DARI ${_questions.length}',
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+              letterSpacing: 1,
+              color: p.inkFaint,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Text(
+              question.text,
+              style: TextStyle(fontSize: 17, height: 1.6, color: p.ink),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Expanded(
+            child: SingleChildScrollView(
+              child: question.type.hasOptions
+                  ? ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < question.options.length; i++) ...[
+                            if (i > 0) const SizedBox(height: 10),
+                            _OptionTile(
+                              letter: String.fromCharCode(65 + i),
+                              text: question.options[i].text,
+                              selected: question.selectedOptionIds.contains(
+                                question.options[i].id,
+                              ),
+                              onTap: () => setState(() {
+                                question.selectedOptionIds = [
+                                  question.options[i].id,
+                                ];
+                                _scheduleSync();
+                              }),
+                            ),
+                          ],
+                        ],
+                      ),
+                    )
+                  : ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 620),
+                      child: _EssayField(
+                        key: ValueKey('essay-$_current'),
+                        controller: _essayControllerFor(_current),
+                        onChanged: (text) => setState(() {
+                          question.answerText = text.trim().isEmpty
+                              ? null
+                              : text;
+                          _scheduleSync();
+                        }),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              OutlinedButton(
+                onPressed: _current > 0
+                    ? () => setState(() => _current--)
+                    : null,
+                child: const Text('← Sebelumnya'),
+              ),
+              const Spacer(),
+              OutlinedButton(
+                onPressed: _toggleFlag,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: p.amberSoft,
+                  foregroundColor: p.amber,
+                  side: BorderSide.none,
+                ),
+                child: const Text('🚩 Ragu-ragu'),
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _current < _questions.length - 1
+                    ? () => setState(() => _current++)
+                    : null,
+                child: const Text('Berikutnya →'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
 
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: p.paper,
         body: SafeArea(
+          bottom: wide,
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: p.surface,
                   border: Border(bottom: BorderSide(color: p.line)),
@@ -152,9 +303,15 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(widget.package.examSet.title,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5, color: p.ink)),
+                      child: Text(
+                        widget.package.examSet.title,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.5,
+                          color: p.ink,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Pill(
@@ -165,7 +322,10 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
                     if (_secondsLeft != null) ...[
                       const SizedBox(width: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: p.dangerSoft,
                           borderRadius: BorderRadius.circular(999),
@@ -185,194 +345,70 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
                 ),
               ),
               Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'SOAL ${_current + 1} DARI ${_questions.length}',
-                              style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
-                                  letterSpacing: 1,
-                                  color: p.inkFaint),
-                            ),
-                            const SizedBox(height: 10),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 620),
-                              child: Text(question.text,
-                                  style: TextStyle(fontSize: 17, height: 1.6, color: p.ink)),
-                            ),
-                            const SizedBox(height: 22),
-                            Expanded(
+                child: wide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: questionColumn),
+                          Container(width: 1, color: p.line),
+                          SizedBox(
+                            width: 230,
+                            child: Container(
+                              color: p.surfaceVariant,
+                              padding: const EdgeInsets.all(20),
                               child: SingleChildScrollView(
-                                child: question.type.hasOptions
-                                    ? ConstrainedBox(
-                                        constraints: const BoxConstraints(maxWidth: 620),
-                                        child: Column(
-                                          children: [
-                                            for (var i = 0; i < question.options.length; i++) ...[
-                                              if (i > 0) const SizedBox(height: 10),
-                                              _OptionTile(
-                                                letter: String.fromCharCode(65 + i),
-                                                text: question.options[i].text,
-                                                selected: question.selectedOptionIds
-                                                    .contains(question.options[i].id),
-                                                onTap: () => setState(() {
-                                                  question.selectedOptionIds = [question.options[i].id];
-                                                  _scheduleSync();
-                                                }),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      )
-                                    : ConstrainedBox(
-                                        constraints: const BoxConstraints(maxWidth: 620),
-                                        child: _EssayField(
-                                          key: ValueKey('essay-$_current'),
-                                          controller: _essayControllerFor(_current),
-                                          onChanged: (text) => setState(() {
-                                            question.answerText = text.trim().isEmpty ? null : text;
-                                            _scheduleSync();
-                                          }),
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                OutlinedButton(
-                                  onPressed: _current > 0
-                                      ? () => setState(() => _current--)
-                                      : null,
-                                  child: const Text('← Sebelumnya'),
-                                ),
-                                const Spacer(),
-                                OutlinedButton(
-                                  onPressed: _toggleFlag,
-                                  style: OutlinedButton.styleFrom(
-                                    backgroundColor: p.amberSoft,
-                                    foregroundColor: p.amber,
-                                    side: BorderSide.none,
-                                  ),
-                                  child: const Text('🚩 Ragu-ragu'),
-                                ),
-                                const SizedBox(width: 10),
-                                ElevatedButton(
-                                  onPressed: _current < _questions.length - 1
-                                      ? () => setState(() => _current++)
-                                      : null,
-                                  child: const Text('Berikutnya →'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Container(width: 1, color: p.line),
-                    SizedBox(
-                      width: 230,
-                      child: Container(
-                        color: p.surfaceVariant,
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('⟳', style: TextStyle(fontSize: 13)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Jawaban disinkron otomatis saat WiFi tersambung kembali.',
-                                    style: TextStyle(fontSize: 11, color: p.inkFaint, height: 1.5),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Divider(color: p.line, height: 1),
-                            const SizedBox(height: 16),
-                            Text(
-                              'NAVIGASI SOAL',
-                              style: TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontSize: 11,
-                                  letterSpacing: 1.2,
-                                  color: p.inkFaint,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 10),
-                            Expanded(
-                              child: GridView.builder(
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 5,
-                                  mainAxisSpacing: 7,
-                                  crossAxisSpacing: 7,
-                                  childAspectRatio: 1,
-                                ),
-                                itemCount: _questions.length,
-                                itemBuilder: (context, i) => _NavCell(
-                                  number: i + 1,
-                                  done: _questions[i].isAnswered,
-                                  flagged: _flagged.contains(_questions[i].examSetQuestionId),
-                                  current: i == _current,
-                                  onTap: () => setState(() => _current = i),
+                                child: _QuestionNavigatorPanel(
+                                  questions: _questions,
+                                  flagged: _flagged,
+                                  current: _current,
+                                  submitting: _submitting,
+                                  onSelect: (i) => setState(() => _current = i),
+                                  onSubmit: () => _confirmSubmit(context),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            _Legend(color: p.accent, label: 'Terjawab ($answeredCount)'),
-                            const SizedBox(height: 6),
-                            _Legend(color: p.amber, label: 'Ragu-ragu (${_flagged.length})'),
-                            const SizedBox(height: 6),
-                            _Legend(
-                              color: p.line,
-                              label: 'Belum dijawab (${_questions.length - answeredCount})',
-                              outlined: true,
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              '$answeredCount / ${_questions.length} soal dikerjakan',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontFamily: 'monospace', fontSize: 11.5, color: p.inkFaint),
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _submitting ? null : () => _confirmSubmit(context),
-                                style: ElevatedButton.styleFrom(backgroundColor: p.danger),
-                                child: _submitting
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : const Text('Kumpulkan Ujian'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                          ),
+                        ],
+                      )
+                    : questionColumn,
               ),
             ],
           ),
         ),
+        bottomNavigationBar: wide
+            ? null
+            : SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.surface,
+                    border: Border(top: BorderSide(color: p.line)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$answeredCount / ${_questions.length} soal dikerjakan',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: p.inkFaint,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _openNavigatorSheet(context),
+                        icon: const Icon(Icons.grid_view_rounded, size: 18),
+                        label: const Text('Navigasi & Kumpulkan'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -382,10 +418,18 @@ class _ExamSessionScreenState extends State<ExamSessionScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Kumpulkan ujian?'),
-        content: const Text('Jawaban yang belum diisi akan dianggap kosong. Tindakan ini tidak bisa dibatalkan.'),
+        content: const Text(
+          'Jawaban yang belum diisi akan dianggap kosong. Tindakan ini tidak bisa dibatalkan.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Kumpulkan')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Kumpulkan'),
+          ),
         ],
       ),
     );
@@ -400,7 +444,11 @@ class _EssayField extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const _EssayField({super.key, required this.controller, required this.onChanged});
+  const _EssayField({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -416,7 +464,11 @@ class _EssayField extends StatelessWidget {
           ),
           child: Text(
             'Soal esai — dikoreksi manual oleh guru, tidak dinilai otomatis',
-            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: p.amber),
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: p.amber,
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -472,7 +524,10 @@ class _OptionTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: selected ? p.accent : Colors.transparent,
-                  border: Border.all(color: selected ? p.accent : p.line, width: 1.5),
+                  border: Border.all(
+                    color: selected ? p.accent : p.line,
+                    width: 1.5,
+                  ),
                 ),
                 child: Text(
                   letter,
@@ -485,11 +540,134 @@ class _OptionTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(text, style: TextStyle(fontSize: 14.5, color: p.ink))),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(fontSize: 14.5, color: p.ink),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Sync note + question-number grid + legend + submit button. Rendered
+/// either inline in the tablet side panel or inside a phone's modal
+/// bottom sheet (see [_ExamSessionScreenState._openNavigatorSheet]) — both
+/// callers wrap it in a [SingleChildScrollView], so the grid here doesn't
+/// scroll on its own.
+class _QuestionNavigatorPanel extends StatelessWidget {
+  final List<ExamQuestion> questions;
+  final Set<int> flagged;
+  final int current;
+  final bool submitting;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onSubmit;
+
+  const _QuestionNavigatorPanel({
+    required this.questions,
+    required this.flagged,
+    required this.current,
+    required this.submitting,
+    required this.onSelect,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final answeredCount = questions.where((q) => q.isAnswered).length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('⟳', style: TextStyle(fontSize: 13)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Jawaban disinkron otomatis saat WiFi tersambung kembali.',
+                style: TextStyle(fontSize: 11, color: p.inkFaint, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Divider(color: p.line, height: 1),
+        const SizedBox(height: 16),
+        Text(
+          'NAVIGASI SOAL',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            letterSpacing: 1.2,
+            color: p.inkFaint,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            mainAxisSpacing: 7,
+            crossAxisSpacing: 7,
+            childAspectRatio: 1,
+          ),
+          itemCount: questions.length,
+          itemBuilder: (context, i) => _NavCell(
+            number: i + 1,
+            done: questions[i].isAnswered,
+            flagged: flagged.contains(questions[i].examSetQuestionId),
+            current: i == current,
+            onTap: () => onSelect(i),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _Legend(color: p.accent, label: 'Terjawab ($answeredCount)'),
+        const SizedBox(height: 6),
+        _Legend(color: p.amber, label: 'Ragu-ragu (${flagged.length})'),
+        const SizedBox(height: 6),
+        _Legend(
+          color: p.line,
+          label: 'Belum dijawab (${questions.length - answeredCount})',
+          outlined: true,
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '$answeredCount / ${questions.length} soal dikerjakan',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11.5,
+            color: p.inkFaint,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: submitting ? null : onSubmit,
+            style: ElevatedButton.styleFrom(backgroundColor: p.danger),
+            child: submitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Kumpulkan Ujian'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -545,7 +723,12 @@ class _NavCell extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               '$number',
-              style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 12.5, color: fg),
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                color: fg,
+              ),
             ),
           ),
         ),
@@ -559,7 +742,11 @@ class _Legend extends StatelessWidget {
   final String label;
   final bool outlined;
 
-  const _Legend({required this.color, required this.label, this.outlined = false});
+  const _Legend({
+    required this.color,
+    required this.label,
+    this.outlined = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -577,7 +764,10 @@ class _Legend extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(label, style: TextStyle(fontSize: 11.5, color: p.inkSoft)),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 11.5, color: p.inkSoft),
+          ),
         ),
       ],
     );

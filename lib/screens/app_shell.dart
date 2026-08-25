@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/exam_models.dart';
 import '../state/session_controller.dart';
 import '../theme/app_palette.dart';
-import '../widgets/nav_rail.dart';
-import '../widgets/shell_header.dart';
+import '../widgets/responsive.dart';
+import '../widgets/shell_body.dart';
 import 'dashboard_screen.dart';
 import 'history_screen.dart';
 import 'materi_screen.dart';
@@ -59,47 +59,41 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
+  void _selectTab(int i) => setState(() => _index = i);
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     return Scaffold(
       backgroundColor: p.paper,
       body: SafeArea(
-        child: Row(
-          children: [
-            NavRail(selectedIndex: _index, onSelect: (i) => setState(() => _index = i)),
-            Container(width: 1, color: p.line),
-            Expanded(
-              child: Column(
-                children: [
-                  const ShellHeader(),
-                  Expanded(
-                    child: IndexedStack(
-                      index: _index,
-                      children: [
-                        DashboardScreen(
-                          loading: _loading,
-                          error: _error,
-                          exams: _data?.exams ?? const [],
-                          onRefresh: _load,
-                        ),
-                        const MateriScreen(),
-                        HistoryScreen(
-                          loading: _loading,
-                          error: _error,
-                          history: _data?.history ?? const [],
-                          onRefresh: _load,
-                        ),
-                        const ProfileScreen(),
-                      ],
-                    ),
-                  ),
-                ],
+        child: ShellBody(
+          selectedIndex: _index,
+          onSelect: _selectTab,
+          child: IndexedStack(
+            index: _index,
+            children: [
+              DashboardScreen(
+                loading: _loading,
+                error: _error,
+                exams: _data?.exams ?? const [],
+                onRefresh: _load,
               ),
-            ),
-          ],
+              const MateriScreen(),
+              HistoryScreen(
+                loading: _loading,
+                error: _error,
+                history: _data?.history ?? const [],
+                onRefresh: _load,
+              ),
+              const ProfileScreen(),
+            ],
+          ),
         ),
       ),
+      bottomNavigationBar: isWideLayout(context)
+          ? null
+          : ShellBottomNav(selectedIndex: _index, onSelect: _selectTab),
     );
   }
 }

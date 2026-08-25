@@ -4,13 +4,18 @@ import '../theme/app_palette.dart';
 import 'app_mark.dart';
 
 /// Left-side navigation rail — the tablet-appropriate pattern (vs. a
-/// bottom tab bar on phones). Deliberately absent on Login and the locked
-/// exam session screen.
+/// bottom tab bar on phones, see [ShellBottomNav] in `shell_body.dart`).
+/// Shown only at [kTabletBreakpoint] and above (see [ShellBody]).
+/// Deliberately absent on Login and the locked exam session screen.
 class NavRail extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
-  const NavRail({super.key, required this.selectedIndex, required this.onSelect});
+  const NavRail({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +95,11 @@ class _RailItem extends StatelessWidget {
                 children: [
                   Column(
                     children: [
-                      Icon(icon, size: 20, color: selected ? p.accent : p.inkFaint),
+                      Icon(
+                        icon,
+                        size: 20,
+                        color: selected ? p.accent : p.inkFaint,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         label,
@@ -107,7 +116,10 @@ class _RailItem extends StatelessWidget {
                       top: -2,
                       right: 4,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: p.amber,
                           borderRadius: BorderRadius.circular(999),
