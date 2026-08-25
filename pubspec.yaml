@@ -56,6 +56,22 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+  # Generates Android/iOS launcher icons (incl. Android adaptive icon
+  # foreground+background) from assets/icon/*. Run: dart run flutter_launcher_icons
+  flutter_launcher_icons: ^0.14.3
+
+# Launcher icon source images and generation targets — see assets/icon/README
+# (icon-master.png: opaque, used for legacy Android + iOS; icon-foreground.png:
+# transparent, content padded to the Android adaptive-icon safe zone).
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icon/icon-master.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon-foreground.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
