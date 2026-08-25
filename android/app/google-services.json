@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "970285042627",
+    "project_id": "cbt-siakad",
+    "storage_bucket": "cbt-siakad.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970285042627:android:079b3ac220cf14db030b76",
+        "android_client_info": {
+          "package_name": "com.ppi50.siakad.mobile_cbt_siakad"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA30VCnoYOnZbY4YktFvgFAFrN6UHcigYY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -68,7 +68,7 @@ class _CbtAppState extends State<CbtApp> {
           builder: (context, _) {
             return MaterialApp(
               navigatorKey: _navigatorKey,
-              title: 'CBT SIAKAD',
+              title: 'CBT PPI 50',
               debugShowCheckedModeBanner: false,
               themeMode: _themeController.mode,
               theme: AppTheme.light,
