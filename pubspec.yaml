@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.11.4
@@ -35,6 +35,16 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # In-house update mechanism (Play Store stand-in): check current app
+  # version, download the APK, and hand it to the OS installer.
+  http: ^1.2.2
+  package_info_plus: ^8.1.2
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
+
+  # /api/v1/student/* auth: token storage
+  flutter_secure_storage: ^9.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -45,6 +55,22 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # Generates Android/iOS launcher icons (incl. Android adaptive icon
+  # foreground+background) from assets/icon/*. Run: dart run flutter_launcher_icons
+  flutter_launcher_icons: ^0.14.3
+
+# Launcher icon source images and generation targets — see assets/icon/README
+# (icon-master.png: opaque, used for legacy Android + iOS; icon-foreground.png:
+# transparent, content padded to the Android adaptive-icon safe zone).
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icon/icon-master.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon-foreground.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

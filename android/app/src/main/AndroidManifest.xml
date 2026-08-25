@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Sideloading updates without Play Store requires this to launch the
+         package installer for the downloaded APK. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
-        android:label="mobile_cbt_siakad"
+        android:label="CBT PPI 50"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
